@@ -1,10 +1,11 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace URacing
 {
     public class CameraController : MonoBehaviour
     {
-        [SerializeField] private Transform[] _targets = default;
         [SerializeField] private Vector3 _offset = default;
 
         [SerializeField] private float _minZoomDistance = 10f;
@@ -15,15 +16,41 @@ namespace URacing
         [SerializeField] private float _minY = 10f;
         [SerializeField] private float _maxY = 40f;
 
+        private readonly List<ICameraTarget> _targets = new List<ICameraTarget>();
         private Vector3 _velocity;
 
-        public void Init()
+        public void AddTarget(ICameraTarget target)
         {
+            if (_targets.Contains(target))
+                throw new Exception("Targets list already contain: " + target.Follow.name);
+
+            _targets.Add(target);
+        }
+
+        public void RemoveTarget(ICameraTarget target)
+        {
+            if (!_targets.Contains(target))
+                throw new Exception("Targets list does not contain: " + target.Follow.name);
+
+            _targets.Remove(target);
+        }
+
+        public void ClearTargets()
+        {
+            for (var i = _targets.Count - 1; i >= 0; i--)
+            {
+                var target = _targets[i];
+
+                if (target.ForceShow)
+                    continue;
+
+                RemoveTarget(target);
+            }
         }
 
         private void LateUpdate()
         {
-            if (_targets.Length <= 0)
+            if (_targets.Count <= 0)
                 return;
 
             var bounds = EncapsulateTargets();
@@ -65,8 +92,8 @@ namespace URacing
 
         private Vector3 CenterPoint(Bounds bounds)
         {
-            if (_targets.Length == 1)
-                return _targets[0].position;
+            if (_targets.Count == 1)
+                return _targets[0].Follow.position;
 
             var center = bounds.center;
             center.y = 0f;
@@ -76,10 +103,10 @@ namespace URacing
 
         private Bounds EncapsulateTargets()
         {
-            var bounds = new Bounds(_targets[0].position, Vector3.zero);
+            var bounds = new Bounds(_targets[0].Follow.position, Vector3.zero);
 
             foreach (var target in _targets)
-                bounds.Encapsulate(target.position);
+                bounds.Encapsulate(target.Follow.position);
 
             return bounds;
         }

@@ -1,35 +1,36 @@
 ﻿using UnityEngine;
 using System;
+using System.Linq;
 
 namespace URacing.Controls
 {
-    [Serializable]
-    public enum ECarDrivingType
-    {
-        RearWheelDrive,
-        FrontWheelDrive,
-        AllWheelDrive
-    }
-
     public interface ICarController
     {
         string Name { get; }
     }
 
-    public class PlayerCarController : MonoBehaviour, ICarController
+    public class PlayerCarController : MonoBehaviour, ICarController, ICameraTarget, IDisposable
     {
+        [Serializable]
+        private enum ECarDrivingType
+        {
+            RearWheelDrive,
+            FrontWheelDrive,
+            AllWheelDrive
+        }
+
         [Serializable]
         private class Wheel
         {
             public WheelCollider Collider = default;
             public Transform Shape = default;
-            public bool IsFront = default;
 
             public float LocalZPosition => Collider.transform.localPosition.z;
         }
 
         private const KeyCode HAND_BRAKE = KeyCode.Space;
 
+        [SerializeField] private Rigidbody _rigidbody = default;
         [SerializeField] private ECarDrivingType _carDrivingType = default;
 
         [SerializeField] private float _maxSteeringAngle = 30f;
@@ -44,6 +45,10 @@ namespace URacing.Controls
 
         public string Name => "PlayerController";
 
+        public Rigidbody Rigidbody => _rigidbody;
+        public Transform Follow => transform;
+        public bool ForceShow => true;
+
         private void Update()
         {
             foreach (var wheel in _wheels)
@@ -52,7 +57,7 @@ namespace URacing.Controls
             var angle = _maxSteeringAngle * Input.GetAxis("Horizontal");
             var torque = _maxTorque * Input.GetAxis("Vertical");
 
-            var handBrake = Input.GetKey(HAND_BRAKE) ? _maxBrakeTorque : 0;
+            var handBrake = Input.GetKey(HAND_BRAKE) ? _maxBrakeTorque : 0f;
 
             foreach (var wheel in _wheels)
             {
@@ -75,17 +80,33 @@ namespace URacing.Controls
 
                 wheelCollider.GetWorldPose(out var p, out var q);
 
-                if (wheel.IsFront)
-                {
-                    wheelShape.rotation = q * Quaternion.Euler(0, 180, 0);
-                    wheelShape.position = p;
-                }
-                else
-                {
-                    wheelShape.position = p;
-                    wheelShape.rotation = q;
-                }
+                wheelShape.rotation = q;
+                wheelShape.position = p;
             }
+        }
+
+        private void FixedUpdate()
+        {
+            foreach (var wheelCollider in _wheels.Select(wheel => wheel.Collider))
+            {
+                if (!wheelCollider.GetGroundHit(out var hit))
+                    continue;
+
+                var fFriction = wheelCollider.forwardFriction;
+                var material = hit.collider.material;
+
+                fFriction.stiffness = material.staticFriction;
+                wheelCollider.forwardFriction = fFriction;
+
+                var sFriction = wheelCollider.sidewaysFriction;
+                sFriction.stiffness = material.staticFriction;
+                wheelCollider.sidewaysFriction = sFriction;
+            }
+        }
+
+        public void Dispose()
+        {
+            gameObject.SetActive(false);
         }
     }
 }

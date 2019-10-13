@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using URacing.Controls;
 
@@ -14,38 +15,61 @@ namespace URacing.Checkpoints
             public float TimeAmount = default;
         }
 
+        private const int CHECKPOINTS_TO_SHOW_COUNT = 2;
+
         [SerializeField] private RoundTimeSettings[] _timeSettings = default;
         [SerializeField] private Checkpoint[] _checkpoints = default;
 
+        private CameraController _cameraController;
+        private Action<Checkpoint> _onCheckpointPassed;
+        private Action<int> _onCheckpointGameFinished;
+
         private float _timer;
 
-        private Dictionary<float, int> _timeCounters = new Dictionary<float, int>();
+        private readonly Dictionary<float, int> _timeCounters = new Dictionary<float, int>();
+        private readonly List<Checkpoint> _availableCheckpoints = new List<Checkpoint>();
 
-        private List<Checkpoint> _availableCheckpoints = new List<Checkpoint>();
-        private Checkpoint _nextCheckpoint;
+        public Checkpoint NextCheckpoint { get; private set; }
 
-        public void Init()
+        public void Init(CameraController cameraController, Action<Checkpoint> onCheckpointPassed,
+            Action<int> onCheckpointGameFinished)
         {
+            _cameraController = cameraController;
+            _onCheckpointPassed = onCheckpointPassed;
+            _onCheckpointGameFinished = onCheckpointGameFinished;
+
+            var bestTime = float.MaxValue;
+
             foreach (var roundTime in _timeSettings)
+            {
                 _timeCounters.Add(roundTime.TimeAmount, roundTime.StarsCount);
 
-            foreach (var checkpoint in _checkpoints)
-            {
-                _availableCheckpoints.Add(checkpoint);
-                checkpoint.Init(OnCheckpointEnter);
+                if (roundTime.TimeAmount < bestTime)
+                    bestTime = roundTime.TimeAmount;
             }
 
-            _nextCheckpoint = _availableCheckpoints[0];
+            var oneCheckpointTime = bestTime / _checkpoints.Length;
+
+            for (var i = 0; i < _checkpoints.Length; i++)
+            {
+                var checkpoint = _checkpoints[i];
+
+                checkpoint.Init(i > 0 ? oneCheckpointTime * i : oneCheckpointTime, OnCheckpointEnter);
+
+                _availableCheckpoints.Add(checkpoint);
+            }
+
+            SetNextCheckpoint();
         }
 
-        private void Update()
+        public void UpdateTimer(float time)
         {
-            _timer += Time.deltaTime;
+            _timer = time;
         }
 
         private void OnCheckpointEnter(Checkpoint checkpoint, ICarController carController)
         {
-            if (checkpoint != _nextCheckpoint)
+            if (checkpoint != NextCheckpoint)
                 return;
 
 #if UNITY_EDITOR
@@ -61,28 +85,58 @@ namespace URacing.Checkpoints
             {
                 Debug.Log("Game over");
 
-                var time = _timer;
-                var starsCount = CalculateStarsCount(time);
+                var starsCount = CalculateStarsCount(_timer);
+                _onCheckpointGameFinished?.Invoke(starsCount);
 
                 Debug.Log("Stars: " + starsCount);
 
                 return;
             }
 
-            _nextCheckpoint = _availableCheckpoints[0];
+            SetNextCheckpoint();
+            _onCheckpointPassed?.Invoke(checkpoint);
         }
 
-        public int CalculateStarsCount(float target)
+        private void SetNextCheckpoint()
         {
-            var starsAmount = 0;
+            NextCheckpoint = _availableCheckpoints[0];
+            NextCheckpoint.SetAsNextCheckpoint();
 
-            foreach (var timeCounter in _timeCounters)
+            AddCheckpointsToCamera();
+        }
+
+        private void AddCheckpointsToCamera()
+        {
+            _cameraController.ClearTargets();
+
+            var amountOfAddedTargets = 0;
+
+            foreach (var checkpoint in _checkpoints.Where(checkpoint => !checkpoint.Passed))
             {
-                if (target <= timeCounter.Key)
-                    starsAmount = timeCounter.Value;
+                _cameraController.AddTarget(checkpoint);
+
+                amountOfAddedTargets++;
+
+                if (amountOfAddedTargets > CHECKPOINTS_TO_SHOW_COUNT)
+                    return;
             }
+        }
+
+        private int CalculateStarsCount(float target)
+        {
+            var starsAmount = 1;
+
+            foreach (var timeCounter in _timeCounters.Where(timeCounter => target <= timeCounter.Key))
+                starsAmount = timeCounter.Value;
 
             return starsAmount;
         }
+
+#if UNITY_EDITOR
+        public void UpdateCheckpoints(Checkpoint[] checkpoints)
+        {
+            _checkpoints = checkpoints;
+        }
+#endif
     }
 }

@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93cd562b4565401a87ece059e6a7b9d0, type: 3}
+  m_Name: Vehicles
+  m_EditorClassIdentifier: 
+  Vehicles:
+  - VehicleKey: SportCar
+    CarController: {fileID: 375306471231224792, guid: cd7961ed27e09e24788eb2af31ef84a3,
+      type: 3}
+  - VehicleKey: Jeep
+    CarController: {fileID: 6272540472229916762, guid: a2d71357edfcaee4cb9c103a4effd03e,
+      type: 3}
+  - VehicleKey: Van
+    CarController: {fileID: 6228150538483794262, guid: 5a980350ca921024c9a720466302ca22,
+      type: 3}

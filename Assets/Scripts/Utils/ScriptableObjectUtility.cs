@@ -36,10 +36,10 @@ namespace URacing.Utils
             Selection.activeObject = asset;
         }
 
-//        [MenuItem("Assets/Create/CheckpointSettings")]
-//        public static void CreateCheckpointSettings()
-//        {
-//            CreateAsset<CheckpointSettings>();
-//        }
+        [MenuItem("Assets/Create/VehicleSettings")]
+        public static void CreateVehicleSettings()
+        {
+            CreateAsset<AvailableVehicles>();
+        }
     }
 }
